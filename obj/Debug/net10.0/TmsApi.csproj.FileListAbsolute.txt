@@ -27,3 +27,6 @@ C:\Users\Y\TmsApi\obj\Debug\net10.0\TmsApi.pdb
 C:\Users\Y\TmsApi\obj\Debug\net10.0\TmsApi.genruntimeconfig.cache
 C:\Users\Y\TmsApi\obj\Debug\net10.0\ref\TmsApi.dll
 C:\Users\Y\TmsApi\obj\Debug\net10.0\TmsApi.sourcelink.json
+C:\Users\Y\TmsApi\obj\Debug\net10.0\TmsApi.csproj.AssemblyReference.cache
+C:\Users\Y\TmsApi\bin\Debug\net10.0\Scalar.AspNetCore.dll
+C:\Users\Y\TmsApi\obj\Debug\net10.0\TmsApi.csproj.Up2Date
