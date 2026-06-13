@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using System.Text.Encodings.Web;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 // builder.Services.AddSingleton<EnrollmentWorker>();
@@ -8,6 +9,8 @@ builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddSingleton<EnrollmentWorker>();
 builder.Services.AddLogging();
 builder.Services.AddControllers();
+builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
 // Options binding + validation
 builder.Services.AddOptions<PaymentOptions>()
     .BindConfiguration("Payments")
@@ -26,7 +29,6 @@ builder.Services.AddOptions<PaymentOptions>()
 // builder.Services.AddAuthorization();
 
 var app = builder.Build();
-// app.MapScalarApiReference();
 app.UseRouting();
 // app.MapGet("/test-di", (IEnrollmentService service) =>
 // {
@@ -38,8 +40,20 @@ app.UseRouting();
 
 // app.UseAuthentication();
 // app.UseAuthorization();
+app.MapOpenApi();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapScalarApiReference();
+}
 app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 app.MapControllers();
+app.MapGet("/api/error", () =>
+{
+throw new TmsDatabaseException("Simulated database failure for ProblemDetails testing");
+});
 
 // app.MapGet("/api/assessments/results", () =>
 // {

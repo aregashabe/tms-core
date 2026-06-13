@@ -1,10 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "ZSc2jx40yLM=",
+  "dgSpecHash": "p5VJdxDonQE=",
   "success": true,
   "projectFilePath": "C:\\Users\\Y\\TmsApi\\TmsApi.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Y\\.nuget\\packages\\scalar.aspnetcore\\2.16.2\\scalar.aspnetcore.2.16.2.nupkg.sha512"
+    "C:\\Users\\Y\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.9\\microsoft.aspnetcore.openapi.10.0.9.nupkg.sha512",
+    "C:\\Users\\Y\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",
+    "C:\\Users\\Y\\.nuget\\packages\\scalar.aspnetcore\\2.16.3\\scalar.aspnetcore.2.16.3.nupkg.sha512"
   ],
   "logs": []
 }
