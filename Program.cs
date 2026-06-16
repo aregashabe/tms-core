@@ -4,9 +4,10 @@ using System.Text.Encodings.Web;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-// builder.Services.AddSingleton<EnrollmentWorker>();
-builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
+builder.Services.AddSingleton<IEnrollmentService, EnrollmentService>();
 builder.Services.AddSingleton<EnrollmentWorker>();
+builder.Services.AddSingleton<IStudentService, StudentService>();
+builder.Services.AddSingleton<ICourseService, CourseService>();
 builder.Services.AddLogging();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

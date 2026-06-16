@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/enrollments")]
 public class EnrollmentsController : ControllerBase
 {
-    private readonly IEnrollmentService _enrollmentService;
+   private readonly IEnrollmentService _enrollmentService;
 
     public EnrollmentsController(IEnrollmentService enrollmentService)
     {
