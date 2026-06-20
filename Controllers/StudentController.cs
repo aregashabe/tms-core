@@ -12,13 +12,18 @@ public class StudentRegisterController : ControllerBase
     }
 
     // GET all
-    [HttpGet]
-    public async Task<IActionResult> GetAll()
-    {
-        var result = await _service.GetAllAsync();
-        return Ok(result);
-    }
-
+    // [HttpGet]
+    // public async Task<IActionResult> GetAll()
+    // {
+    //     var result = await _service.GetAllAsync();
+    //     return Ok(result);
+    // }
+[HttpGet("active-high-gpa-count")]
+public async Task<IActionResult> GetCount()
+{
+    var count = await _service.GetActiveHighGpaCountAsync();
+    return Ok(count);
+}
     // GET by id
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(string id)
@@ -26,7 +31,7 @@ public class StudentRegisterController : ControllerBase
         var record = await _service.GetByIdAsync(id);
         return record is not null ? Ok(record) : NotFound();
     }
-
+ 
     // POST register student
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateRegisterRequest request)

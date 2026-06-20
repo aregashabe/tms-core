@@ -46,4 +46,11 @@ public class CourseController : ControllerBase
         var deleted = await _service.DeleteAsync(id);
         return deleted ? NoContent() : NotFound();
     }
+    [HttpGet("enrollment-stats")]
+public async Task<IActionResult> GetCourseEnrollmentStats()
+{
+    var stats = await _service.GetCourseEnrollmentStatsAsync();
+    return Ok(stats);
+}
+
 }

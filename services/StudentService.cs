@@ -1,20 +1,25 @@
+using TmsApi.Data;
+using Microsoft.EntityFrameworkCore;
 public interface IStudentService
 {
     Task<StudentRecord> RegisterAsync(string studentId, string name, int age, decimal? gpa);
     Task<StudentRecord?> GetByIdAsync(string id);
     Task<IReadOnlyList<StudentRecord>> GetAllAsync();
     Task<bool> DeleteAsync(string id);
+    Task<int> GetActiveHighGpaCountAsync();
 }
 
 
 public class StudentService : IStudentService
 {
     private readonly Dictionary<string, StudentRecord> _store = new();
+     private readonly TmsDbContext _context;
     private readonly ILogger<StudentService> _logger;
 
-    public StudentService(ILogger<StudentService> logger)
+    public StudentService(ILogger<StudentService> logger,TmsDbContext context)
     {
         _logger = logger;
+        _context = context;
     }
 
     public Task<StudentRecord> RegisterAsync(string studentId, string name, int age, decimal? gpa)
@@ -73,4 +78,21 @@ public class StudentService : IStudentService
 
         return Task.FromResult(removed);
     }
+    // public async Task<int> GetActiveHighGpaStudentsCount()
+    // {
+    //     return await _context.Students
+    //         .Where(s => s.IsActive && s.GPA >= 3.0m)
+    //         .CountAsync();
+    // }
+
+
+    public async Task<int> GetActiveHighGpaCountAsync()
+{
+    return await _context.Students
+        .Where(s => s.IsActive && s.GPA >= 3.0m)
+        .CountAsync();
 }
+
+
+}
+

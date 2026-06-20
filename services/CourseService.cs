@@ -1,14 +1,19 @@
+using TmsApi.Data;
+using Microsoft.EntityFrameworkCore;
 public interface ICourseService{
      Task<CourseRecord> RegisterAsync(string title,int capacity);
     Task<CourseRecord?> GetByIdAsync(string id);
     Task<IReadOnlyList<CourseRecord>> GetAllAsync();
     Task<bool> DeleteAsync(string id);
+    Task<List<object>> GetCourseEnrollmentStatsAsync();
 }
 public class CourseService: ICourseService
 {
      private readonly Dictionary<string, CourseRecord> _store = new();
     private readonly ILogger<CourseService> _logger;
-    public CourseService(ILogger<CourseService> logger){
+    private readonly TmsDbContext _context;
+
+    public CourseService(ILogger<CourseService> logger, TmsDbContext context){
         _logger=logger;
     }
       public Task<CourseRecord> RegisterAsync(string title,  int capacity)
@@ -61,5 +66,19 @@ public class CourseService: ICourseService
 
         return Task.FromResult(removed);
     }
+
+    public async Task<List<object>> GetCourseEnrollmentStatsAsync()
+{
+    var list = await _context.Courses
+        .Select(c => new
+        {
+            c.Title,
+            EnrollmentCount = _context.Enrollments.Count(e => e.CourseId == c.Id)
+        })
+        .OrderByDescending(x => x.EnrollmentCount)
+        .ToListAsync();
+
+    return Task.FromResult(list.Cast<object>().ToList());
+}
 
 }
