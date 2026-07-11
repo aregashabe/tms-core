@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-
+namespace TmsApi.Services;
 [ApiController]
 [Route("api/studentregister")]
 public class StudentRegisterController : ControllerBase
@@ -11,13 +11,20 @@ public class StudentRegisterController : ControllerBase
         _service = service;
     }
 
-    // GET all
-    // [HttpGet]
-    // public async Task<IActionResult> GetAll()
-    // {
-    //     var result = await _service.GetAllAsync();
-    //     return Ok(result);
-    // }
+    //GET all
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var result = await _service.GetAllAsync();
+        return Ok(result);
+    }
+    [HttpGet("paged")]
+    
+public async Task<IActionResult> GetPaged(  int pageNumber = 1,CancellationToken ct = default)
+{
+    var result = await _service.GetPagedStudentsAsync(pageNumber, ct);
+    return Ok(result);
+}
 [HttpGet("active-high-gpa-count")]
 public async Task<IActionResult> GetCount()
 {
@@ -45,6 +52,14 @@ public async Task<IActionResult> GetCount()
 
         return CreatedAtAction(nameof(GetById), new { id = record.Id }, record);
     }
+[HttpGet("enrollment-report")]
+
+public async Task<IActionResult> GetEnrollmentReport(CancellationToken cancellationToken)
+{
+    var report = await _service.GetStudentEnrollmentReport(cancellationToken);
+    return Ok(report);
+}
+
 
     // DELETE
     [HttpDelete("{id}")]

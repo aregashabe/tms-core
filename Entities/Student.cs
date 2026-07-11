@@ -1,6 +1,7 @@
 namespace TmsApi.Entities;
 public class Student
 {
+public bool IsDeleted { get; set; }
 public int Id { get; set; }
 // surrogate primary key — internal, used by foreign keys
 public required string RegistrationNumber { get; set; } // natural key — human-readable (uniqueness configured in Session 2)

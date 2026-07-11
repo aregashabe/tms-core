@@ -1,98 +1,145 @@
-using TmsApi.Data;
+using Tms.Api.Dtos;
 using Microsoft.EntityFrameworkCore;
+using TmsApi.Entities;
+using TmsApi.Data;
+using TmsApi.Entities;
+using Microsoft.EntityFrameworkCore;
+
 public interface IStudentService
 {
-    Task<StudentRecord> RegisterAsync(string studentId, string name, int age, decimal? gpa);
-    Task<StudentRecord?> GetByIdAsync(string id);
-    Task<IReadOnlyList<StudentRecord>> GetAllAsync();
+    Task<Student> RegisterAsync(string registrationNumber, string name, int age, decimal? gpa);
+    Task<Student?> GetByIdAsync(string id);
+    Task<IReadOnlyList<Student>> GetAllAsync();
     Task<bool> DeleteAsync(string id);
     Task<int> GetActiveHighGpaCountAsync();
+    Task<List<Student>> GetPagedStudentsAsync(int pageNumber, CancellationToken cancellationToken);
+    Task<List<object>> GetStudentEnrollmentReport(CancellationToken cancellationToken);
 }
 
 
 public class StudentService : IStudentService
 {
-    private readonly Dictionary<string, StudentRecord> _store = new();
-     private readonly TmsDbContext _context;
+    private readonly TmsDbContext _context;
     private readonly ILogger<StudentService> _logger;
 
-    public StudentService(ILogger<StudentService> logger,TmsDbContext context)
+    public StudentService(ILogger<StudentService> logger, TmsDbContext context)
     {
         _logger = logger;
         _context = context;
     }
+ public async Task<List<Student>> GetPagedStudentsAsync(
+    int pageNumber,
+    CancellationToken cancellationToken)
+{
+    const int pageSize = 20;
 
-    public Task<StudentRecord> RegisterAsync(string studentId, string name, int age, decimal? gpa)
+    if (pageNumber < 1)
+        pageNumber = 1;   // 🔥 prevents negative OFFSET
+
+    return await _context.Students
+        .OrderBy(s => s.Name)
+        .Skip((pageNumber - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync(cancellationToken);
+}
+    // =========================
+    // REGISTER STUDENT
+    // =========================
+    public async Task<Student> RegisterAsync(string registrationNumber, string name, int age, decimal? gpa)
     {
-        var existing = _store.Values
-            .FirstOrDefault(e => e.StudentId == studentId);
+        var existing = await _context.Students
+            .FirstOrDefaultAsync(s => s.RegistrationNumber == registrationNumber);
 
-        if (existing is not null)
+        if (existing != null)
         {
-            _logger.LogWarning("Duplicate student {StudentId}", studentId);
-            return Task.FromResult(existing);
+            _logger.LogWarning("Duplicate student {RegistrationNumber}", registrationNumber);
+            return existing;
         }
 
-        var id = Guid.NewGuid().ToString("N")[..8];
+        var student = new Student
+        {
+            RegistrationNumber = registrationNumber,
+            Name = name,
+            GPA = gpa ?? 0m,
+            IsActive = true
+        };
 
-        var record = new StudentRecord(
-            id,
-            studentId,
-            name,
-            age,
-            gpa ?? 0m,
-            DateTime.UtcNow
-        );
+        _context.Students.Add(student);
+        await _context.SaveChangesAsync();
 
-        _store[id] = record;
+        _logger.LogInformation("Registered student {RegistrationNumber}", registrationNumber);
 
-        _logger.LogInformation(
-            "Registered student {StudentId} - {Name}",
-            studentId, name
-        );
-        _logger.LogInformation("Store count after register: {Count}", _store.Count);
-
-        return Task.FromResult(record);
+        return student;
     }
 
-    public Task<StudentRecord?> GetByIdAsync(string id)
+    // =========================
+    // GET BY ID
+    // =========================
+    public async Task<Student?> GetByIdAsync(string id)
     {
-        _store.TryGetValue(id, out var record);
-        return Task.FromResult(record);
+        return await _context.Students
+            .FirstOrDefaultAsync(s => s.Id.ToString() == id);
     }
 
-    public Task<IReadOnlyList<StudentRecord>> GetAllAsync()
+    // =========================
+    // GET ALL
+    // =========================
+    public async Task<IReadOnlyList<Student>> GetAllAsync()
     {
-        return Task.FromResult((IReadOnlyList<StudentRecord>)_store.Values.ToList());
+        return await _context.Students.ToListAsync();
     }
 
-    public Task<bool> DeleteAsync(string id)
+    // =========================
+    // DELETE
+    // =========================
+    public async Task<bool> DeleteAsync(string id)
     {
-        var removed = _store.Remove(id);
+        var student = await _context.Students
+            .FirstOrDefaultAsync(s => s.Id.ToString() == id);
 
-        if (removed)
-            _logger.LogInformation("Deleted student {Id}", id);
-        else
+        if (student == null)
+        {
             _logger.LogWarning("Student not found {Id}", id);
-        _logger.LogInformation("Store count during get: {Count}", _store.Count);
+            return false;
+        }
 
-        return Task.FromResult(removed);
+        _context.Students.Remove(student);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Deleted student {Id}", id);
+
+        return true;
     }
-    // public async Task<int> GetActiveHighGpaStudentsCount()
-    // {
-    //     return await _context.Students
-    //         .Where(s => s.IsActive && s.GPA >= 3.0m)
-    //         .CountAsync();
-    // }
 
-
+    // =========================
+    // HIGH GPA COUNT
+    // =========================
     public async Task<int> GetActiveHighGpaCountAsync()
+    {
+        return await _context.Students
+            .Where(s => s.IsActive && s.GPA >= 3.0m)
+            .CountAsync();
+    }
+
+
+
+    public async Task<List<object>> GetStudentEnrollmentReport(CancellationToken cancellationToken)
 {
-    return await _context.Students
-        .Where(s => s.IsActive && s.GPA >= 3.0m)
-        .CountAsync();
+    var report = await _context.Students
+        .AsNoTracking()
+        .Select(s => new
+        {
+            s.Name,
+            EnrollmentCount = s.Enrollments.Count
+        })
+        .ToListAsync(cancellationToken);
+
+    foreach (var r in report)
+    {
+        Console.WriteLine($"{r.Name}: {r.EnrollmentCount} enrollments");
+    }
+
+    return report.Cast<object>().ToList();
 }
-
-
 }
 

@@ -1,56 +1,51 @@
 using Microsoft.AspNetCore.Mvc;
+using Tms.Api.Dtos;
+using TmsApi.Services;
+namespace Tms.Api.Controllers;
 
 [ApiController]
-[Route("api/courseregister")]
-public class CourseController : ControllerBase
+[Route("api/courses")]
+public class CoursesController(ICourseService courseService) : ControllerBase
 {
-    private readonly ICourseService _service;
-
-    public CourseController(ICourseService service)
+    [HttpGet("{id:int}", Name = nameof(GetCourseById))]
+    public async Task<IActionResult> GetCourseById(int id, CancellationToken ct)
     {
-        _service = service;
+        var course = await courseService.GetByIdAsync(id, ct);
+
+        return course is not null
+            ? Ok(course)
+            : NotFound();
     }
 
-    // GET all
-    [HttpGet]
-    public async Task<IActionResult> GetAll()
-    {
-        var result = await _service.GetAllAsync();
-        return Ok(result);
-    }
-
-    // GET by id
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(string id)
-    {
-        var record = await _service.GetByIdAsync(id);
-        return record is not null ? Ok(record) : NotFound();
-    }
-
-    // POST register student
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CourseRequest request)
-    {
-        var record = await _service.RegisterAsync(
-            request.Title,
-            request.Capacity
-        );
-
-        return CreatedAtAction(nameof(GetById), new { id = record.Id }, record);
-    }
-
-    // DELETE
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id)
-    {
-        var deleted = await _service.DeleteAsync(id);
-        return deleted ? NoContent() : NotFound();
-    }
-    [HttpGet("enrollment-stats")]
-public async Task<IActionResult> GetCourseEnrollmentStats()
+public async Task<IActionResult> CreateCourse(CreateCourseRequest request, CancellationToken ct)
 {
-    var stats = await _service.GetCourseEnrollmentStatsAsync();
-    return Ok(stats);
-}
+    // TODO 1: Check if course code already exists
+    var exists = await courseService.CodeExistsAsync(request.Code, ct);
 
+    if (exists)
+    {
+        return Conflict(new ProblemDetails
+        {
+            Title = "Course code already exists",
+            Detail = $"A course with code '{request.Code}' is already registered.",
+            Status = StatusCodes.Status409Conflict
+        });
+    }
+
+    var result = await courseService.CreateAsync(request, ct);
+
+    return CreatedAtAction(
+        nameof(GetCourseById),
+        new { id = result.Id },
+        result
+    );
+}
+[HttpGet]
+public async Task<IActionResult> GetCourses(
+[FromQuery] PagedRequest request, CancellationToken ct)
+{
+    var result = await courseService.GetCoursesAsync(request, ct);
+return Ok(result);
+}
 }

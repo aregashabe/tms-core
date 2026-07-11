@@ -1,84 +1,103 @@
+using TmsApi.Entities;
+using Tms.Api.Dtos;
 using TmsApi.Data;
 using Microsoft.EntityFrameworkCore;
-public interface ICourseService{
-     Task<CourseRecord> RegisterAsync(string title,int capacity);
-    Task<CourseRecord?> GetByIdAsync(string id);
-    Task<IReadOnlyList<CourseRecord>> GetAllAsync();
-    Task<bool> DeleteAsync(string id);
-    Task<List<object>> GetCourseEnrollmentStatsAsync();
-}
+namespace TmsApi.Services;
 public class CourseService: ICourseService
 {
-     private readonly Dictionary<string, CourseRecord> _store = new();
     private readonly ILogger<CourseService> _logger;
     private readonly TmsDbContext _context;
 
     public CourseService(ILogger<CourseService> logger, TmsDbContext context){
         _logger=logger;
+        _context = context;
     }
-      public Task<CourseRecord> RegisterAsync(string title,  int capacity)
-    {
-        var existing = _store.Values
-            .FirstOrDefault(e => e.Title == title && e.Capacity==capacity);
+//..............................m6 lab 1........................................................................
 
-        if (existing is not null)
-        {
-            _logger.LogWarning("Duplicate course {Title}", title);
-            return Task.FromResult(existing);
-        }
+public Task<CourseResponseDto?> GetByIdAsync(int id, CancellationToken ct) =>_context.Courses
+.AsNoTracking()
+.Where(c => c.Id == id)
+.Select(c => new CourseResponseDto(
+c.Id, c.Code, c.Title, c.MaxCapacity, c.Enrollments.Count))
+.FirstOrDefaultAsync(ct);
 
-        var id = Guid.NewGuid().ToString("N")[..8];
-
-        var record = new CourseRecord(
-            id,
-           title,
-           capacity,
-            DateTime.UtcNow
-        );
-
-        _store[id] = record;
-
-        _logger.LogInformation(
-            "Registered course {Title} - {Capacity}",
-            title, capacity
-        );
-        return Task.FromResult(record);
-    }
-    public Task<CourseRecord?> GetByIdAsync(string id)
-    {
-        _store.TryGetValue(id, out var record);
-        return Task.FromResult(record);
-    }
-
-    public Task<IReadOnlyList<CourseRecord>> GetAllAsync()
-    {
-        return Task.FromResult((IReadOnlyList<CourseRecord>)_store.Values.ToList());
-    }
-
-    public Task<bool> DeleteAsync(string id)
-    {
-        var removed = _store.Remove(id);
-
-        if (removed)
-            _logger.LogInformation("Deleted student {Id}", id);
-        else
-            _logger.LogWarning("Student not found {Id}", id);
-
-        return Task.FromResult(removed);
-    }
-
-    public async Task<List<object>> GetCourseEnrollmentStatsAsync()
+//.................................m6 lab1
+public async Task<CourseResponseDto> CreateAsync(CreateCourseRequest request, CancellationToken ct)
 {
-    var list = await _context.Courses
-        .Select(c => new
-        {
-            c.Title,
-            EnrollmentCount = _context.Enrollments.Count(e => e.CourseId == c.Id)
-        })
-        .OrderByDescending(x => x.EnrollmentCount)
-        .ToListAsync();
-
-    return Task.FromResult(list.Cast<object>().ToList());
+var course = new Course
+{
+Code = request.Code,
+Title = request.Title,
+MaxCapacity = request.MaxCapacity
+};
+_context.Courses.Add(course);
+await _context.SaveChangesAsync(ct);
+_logger.LogInformation("Created course {CourseId} ({Code})", course.
+Id, course.Code);
+return (await GetByIdAsync(course.Id, ct))!;
 }
+public Task<bool> CodeExistsAsync(string code, CancellationToken ct) =>
+_context.Courses.AsNoTracking().AnyAsync(c => c.Code == code, ct);
 
+public async Task<PagedResponse<CourseResponseDto>> GetCoursesAsync(PagedRequest request,CancellationToken ct)
+{
+    IQueryable<Course> query = _context.Courses.AsNoTracking();
+
+
+    // TODO 2 Search
+    if (!string.IsNullOrWhiteSpace(request.Search))
+    {
+        query = query.Where(c =>
+            EF.Functions.ILike(c.Title, $"%{request.Search}%") ||
+            EF.Functions.ILike(c.Code, $"%{request.Search}%"));
+    }
+
+
+    // TODO 3 Count before paging
+    var totalCount = await query.CountAsync(ct);
+
+
+    // TODO 4 Sorting
+    query = request.OrderBy?.ToLower() switch
+    {
+        "code" =>
+            request.Descending
+            ? query.OrderByDescending(c => c.Code)
+            : query.OrderBy(c => c.Code),
+
+        "maxcapacity" =>
+            request.Descending
+            ? query.OrderByDescending(c => c.MaxCapacity)
+            : query.OrderBy(c => c.MaxCapacity),
+
+        _ =>
+            request.Descending
+            ? query.OrderByDescending(c => c.Title)
+            : query.OrderBy(c => c.Title)
+    };
+
+
+    // TODO 5 Paging + DTO
+    var items = await query
+        .Skip((request.Page - 1) * request.PageSize)
+        .Take(request.PageSize)
+        .Select(c => new CourseResponseDto(
+            c.Id,
+            c.Code,
+            c.Title,
+            c.MaxCapacity,
+            c.Enrollments.Count
+        ))
+        .ToListAsync(ct);
+
+
+    // TODO 6 Response
+    return new PagedResponse<CourseResponseDto>
+    {
+        Items = items,
+        TotalCount = totalCount,
+        Page = request.Page,
+        PageSize = request.PageSize
+    };
+}
 }

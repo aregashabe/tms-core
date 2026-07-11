@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using TmsApi.Services;
+using Tms.Api.Dtos;
 
 public class EnrollmentWorker
 {
@@ -9,17 +11,23 @@ public class EnrollmentWorker
         _scopeFactory = scopeFactory;
     }
 
-    public void ProcessBatch()
+    public async Task ProcessBatch()
     {
-        // TODO2: create scope
         using var scope = _scopeFactory.CreateScope();
 
-        // TODO3: resolve scoped service
         var svc = scope.ServiceProvider.GetRequiredService<IEnrollmentService>();
 
-        // TODO4: use service
-        var result = svc.EnrollAsync("S-001", "CS-101").Result;
+        var request = new EnrollStudentRequest
+        {
+            StudentId = 1
+        };
 
-        Console.WriteLine($"Processed: {result.Id}");
+        var result = await svc.CreateAsync(
+            courseId: 1,
+            request: request,
+            ct: CancellationToken.None
+        );
+
+        Console.WriteLine($"Processed Enrollment Id: {result.Id}");
     }
 }
