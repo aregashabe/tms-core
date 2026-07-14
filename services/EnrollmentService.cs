@@ -58,4 +58,33 @@ public class EnrollmentService : IEnrollmentService
 
         return result!;
     }
+    public async Task<IEnumerable<EnrollmentResponseDto>> GetByCourseIdAsync(
+    int courseId,
+    CancellationToken ct)
+{
+    return await _context.Enrollments
+        .Where(e => e.CourseId == courseId)
+        .Select(e => new EnrollmentResponseDto(
+            e.Id,
+            e.CourseId,
+            e.StudentId,
+            e.EnrolledAt
+        ))
+        .ToListAsync(ct);
+}
+    public async Task<List<EnrollmentResponseDto>> GetByCourseAsync(
+    int courseId,
+    CancellationToken ct)
+{
+    return await _context.Enrollments
+        .Where(e => e.CourseId == courseId)
+        .Select(e => new EnrollmentResponseDto
+        (
+            e.Id,
+            e.CourseId,
+            e.StudentId,
+            e.EnrolledAt
+        ))
+        .ToListAsync(ct);
+}
 }
