@@ -3,6 +3,9 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using TmsApi.Application.Enrollments.Commands;
 using TmsApi.Application.Enrollments.Queries;
+using Microsoft.AspNetCore.SignalR;
+using TmsApi.Api.Hubs;
+using TmsApi.Application.Hubs;
 
 namespace TmsApi.Api.Controllers.V2;
 
@@ -11,7 +14,7 @@ namespace TmsApi.Api.Controllers.V2;
 [ApiVersion("2.0")]
 [Route("api/v{version:apiVersion}/enrollments")]
 [Tags("Enrollments V2")]
-public class EnrollmentsController(IMediator mediator)
+public class EnrollmentsController(IMediator mediator,IHubContext<TmsHub, ITmsHubClient> hubContext)
     : ControllerBase
 {
 
@@ -95,4 +98,13 @@ public class EnrollmentsController(IMediator mediator)
 
         return Ok(schedule);
     }
+    [HttpPost("{id}/approve")]
+public async Task<IActionResult> Approve(string id, CancellationToken ct)
+{
+// Your existing approval logic ...
+// After the database commit succeeds, broadcast to all connected Angular clients
+await hubContext.Clients.All
+.ReceiveEnrollmentStatusUpdated(id, "Approved");
+return NoContent();
+}
 }

@@ -1,13 +1,19 @@
 using Asp.Versioning;
 using FluentValidation;
+using TmsApi.Infrastructure.Services;
 using MediatR;
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using System.Threading.Channels;
 
+using TmsApi.Application.Transcripts;
+using TmsApi.Infrastructure.Transcripts;
+using TmsApi.Infrastructure.Workers;
 using TmsApi.Api.ExceptionHandlers;
 using TmsApi.Api.RateLimiting;
 using TmsApi.Application.Behaviors;
@@ -18,14 +24,23 @@ using TmsApi.Infrastructure.Persistence;
 using TmsApi.Infrastructure.Services;
 using TmsApi.Middleware;
 
-
+using TmsApi.Api.Hubs;
+using TmsApi.Api.Notifications;
+using TmsApi.Application.Notifications;
+using Microsoft.AspNetCore.Antiforgery;
+using TmsApi.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddSignalR();
+builder.Services.AddAntiforgery(options =>
+{
+options.HeaderName = "X-XSRF-TOKEN";
+});
 
 // ======================================
 // RATE LIMITING
 // ======================================
-
+builder.Services.AddHostedService<TranscriptWorker>();
 builder.Services.AddRateLimiter(options =>
 {
     options.AddTokenBucketLimiter("search", opt =>
@@ -141,7 +156,11 @@ opt.QueueLimit = 2;
     };
 });
 
-
+builder.Services.AddSingleton(Channel.CreateBounded<TranscriptRequest>(
+new BoundedChannelOptions(100)
+{
+FullMode = BoundedChannelFullMode.Wait
+}));
 
 // ======================================
 // CONTROLLERS
@@ -206,8 +225,8 @@ builder.Services.AddScoped<EnrollmentWorker>();
 builder.Services.AddScoped<ICachedCourseService, CachedCourseService>();
 
 builder.Services.AddScoped<IAdminEnrollmentService, AdminEnrollmentService>();
-
-
+builder.Services.AddSingleton<ITranscriptStatusStore, InMemoryTranscriptStatusStore>();
+builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptNotificationService>();
 
 // ======================================
 // MEDIATR
@@ -219,6 +238,20 @@ builder.Services.AddMediatR(cfg =>
         typeof(EnrollStudentHandler).Assembly);
 });
 
+builder.Services.AddIdentityCore<TmsUser>(options =>
+{
+// Enterprise Password Policy
+options.Password.RequiredLength = 12;
+options.Password.RequireUppercase = true;
+options.Password.RequireDigit = true;
+options.Password.RequireNonAlphanumeric = true;
+// Brute-Force Lockout Protection
+options.Lockout.MaxFailedAccessAttempts = 5;
+options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+options.Lockout.AllowedForNewUsers = true;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<TmsDbContext>();
 
 
 // ======================================
@@ -323,23 +356,61 @@ builder.Services.AddSwaggerGen(options =>
 // CORS
 // ======================================
 
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy(
+//         "AllowAngular",
+//         policy =>
+//         {
+//             policy
+//             .WithOrigins(
+//                 "http://localhost:4200")
+//             .AllowAnyHeader()
+//             .AllowAnyMethod();
+//         });
+// });
+var allowedOrigins = builder.Configuration
+.GetSection("AllowedOrigins").Get<string[]>()
+?? ["http://localhost:4200"];
+// Register the CORS policy in the Dependency Injection container
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(
-        "AllowAngular",
-        policy =>
-        {
-            policy
-            .WithOrigins(
-                "http://localhost:4200")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-        });
+options.AddPolicy("TmsClient", policy =>
+{
+policy.WithOrigins(allowedOrigins)
+.AllowAnyHeader()
+.AllowAnyMethod()
+.AllowCredentials() // Vital for HttpOnly auth cookies in Session 2
+.SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+});
 });
 
 
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
+app.Use(async (context, next) =>
+{
+if (context.User.Identity?.IsAuthenticated == true || context.
+Request.Cookies.ContainsKey("tms_auth"))
+{
+var antiforgery = context.RequestServices
+.GetRequiredService<IAntiforgery>();
+var tokens = antiforgery.GetAndStoreTokens(context);
+context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!,
+new CookieOptions
+{
+HttpOnly = false, // MUST be false so Angular JavaScript can read it!
+Secure = !builder.Environment.IsDevelopment(),
+SameSite = SameSiteMode.Strict
+});
+}
+await next(context);
+});
+// After app.Build()
+// app.MapHub<TmsHub>("/hubs/tms");
+app.MapHub<TmsHub>("/hubs/tms").RequireCors("TmsClient");
 
 app.MapHealthChecks("/health/live").DisableRateLimiting();
 app.MapHealthChecks("/health/ready").DisableRateLimiting();
@@ -348,8 +419,8 @@ app.MapHealthChecks("/health/ready").DisableRateLimiting();
 // MIDDLEWARE
 // ======================================
 
-app.UseCors("AllowAngular");
-
+// app.UseCors("AllowAngular");
+app.UseCors("TmsClient");
 
 app.UseExceptionHandler();
 
@@ -428,7 +499,15 @@ using (var scope = app.Services.CreateScope())
 
     await DataSeeder.SeedAsync(context);
 }
-
+var service = new CryptoDemoService();
+string hash1 = service.HashUserPassword("Password123!");
+string hash2 = service.HashUserPassword("Password123!");
+// hash1 and hash2 are completely different strings because of unique random salts!
+Console.WriteLine($"Hash 1: {hash1}");
+Console.WriteLine($"Hash 2: {hash2}");
+// Both verify to true against the same plain text:
+bool match1 = service.VerifyUserPassword("Password123!", hash1);// true
+bool match2 = service.VerifyUserPassword("Password123!", hash2);// true
 
 
 app.Run();

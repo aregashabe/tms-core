@@ -142,3 +142,5 @@ C:\Users\Y\TmsApi\TmsApi.Api\obj\Debug\net10.0\TmsApi.Api.pdb
 C:\Users\Y\TmsApi\TmsApi.Api\obj\Debug\net10.0\TmsApi.Api.genruntimeconfig.cache
 C:\Users\Y\TmsApi\TmsApi.Api\obj\Debug\net10.0\ref\TmsApi.Api.dll
 C:\Users\Y\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.Extensions.Caching.Hybrid.dll
+C:\Users\Y\TmsApi\TmsApi.Api\bin\Debug\net10.0\BCrypt-Net-Next.dll
+C:\Users\Y\TmsApi\TmsApi.Api\bin\Debug\net10.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
