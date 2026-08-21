@@ -30,6 +30,9 @@ using TmsApi.Application.Notifications;
 using Microsoft.AspNetCore.Antiforgery;
 using TmsApi.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSignalR();
 builder.Services.AddAntiforgery(options =>
@@ -37,6 +40,27 @@ builder.Services.AddAntiforgery(options =>
 options.HeaderName = "X-XSRF-TOKEN";
 });
 
+builder.Services.AddAuthentication(options =>
+{
+options.DefaultAuthenticateScheme =
+JwtBearerDefaults.AuthenticationScheme;
+options.DefaultChallengeScheme =
+JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+options.TokenValidationParameters = new TokenValidationParameters
+{
+ValidateIssuer = true,
+ValidateAudience = true,
+ValidateLifetime = true,
+ValidateIssuerSigningKey = true,
+ValidIssuer = builder.Configuration["Jwt:Issuer"],
+ValidAudience = builder.Configuration["Jwt:Audience"],
+IssuerSigningKey = new SymmetricSecurityKey(
+Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+};
+});
 // ======================================
 // RATE LIMITING
 // ======================================
@@ -227,7 +251,7 @@ builder.Services.AddScoped<ICachedCourseService, CachedCourseService>();
 builder.Services.AddScoped<IAdminEnrollmentService, AdminEnrollmentService>();
 builder.Services.AddSingleton<ITranscriptStatusStore, InMemoryTranscriptStatusStore>();
 builder.Services.AddSingleton<ITranscriptNotificationService, SignalRTranscriptNotificationService>();
-
+builder.Services.AddScoped<TokenService>();
 // ======================================
 // MEDIATR
 // ======================================
