@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using TmsApi.Application.DTOs;
 using TmsApi.Application.Interfaces;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
+using TmsApi.Infrastructure.Persistence;
 
 namespace TmsApi.Controllers;
-
+[Authorize(Roles = "Instructor,Admin")]
 [ApiController]
 [Route("api/courses")]
 [Tags("Courses")]
@@ -13,8 +15,8 @@ namespace TmsApi.Controllers;
     typeof(ProblemDetails),
     StatusCodes.Status500InternalServerError)]
 public class CoursesController(
-    ICourseService courseService,
-    LinkGenerator linkGenerator) : ControllerBase
+    ICourseService courseService,IAuthorizationService authorizationService,
+    LinkGenerator linkGenerator,TmsDbContext context) : ControllerBase
 {
     [HttpGet("{id:int}", Name = nameof(GetCourseById))]
     [ProducesResponseType(
@@ -160,4 +162,22 @@ public async Task<IActionResult> SearchCourses(
 
     return Ok(results);
 }
+[HttpPut("{id}")]
+public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseDto dto)
+{
+var course = await context.Courses.FindAsync(id);
+if (course == null) return NotFound();
+var authResult = await authorizationService.AuthorizeAsync(User, course, "CanEditCourse");
+if (!authResult.Succeeded)
+{
+return Forbid();
 }
+ 
+course.Title = dto.Title;
+await context.SaveChangesAsync();
+return NoContent(); }
+}
+
+
+
+

@@ -1,4 +1,4 @@
-using TmsApi.Application.DTOs;
+ using TmsApi.Application.DTOs;
 using TmsApi.Domain.Entities;
 namespace TmsApi.Application.Interfaces;
 public interface IEnrollmentService

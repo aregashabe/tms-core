@@ -18,4 +18,5 @@ public interface ICourseService
       Task<IEnumerable<CourseResponseDto>> SearchAsync(
     string? term,
     CancellationToken ct);
+    // Task<UpdateCourseDto>  UpdateCourseAsync(int id,CancellationToken ct);
 }

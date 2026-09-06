@@ -33,6 +33,8 @@ using Microsoft.AspNetCore.Identity;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Tms.Api.Authorization;
+using Microsoft.AspNetCore.Authorization;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSignalR();
 builder.Services.AddAntiforgery(options =>
@@ -61,6 +63,10 @@ IssuerSigningKey = new SymmetricSecurityKey(
 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
 };
 });
+builder.Services.AddAuthorizationBuilder()
+.AddPolicy("CanEditCourse", policy =>
+policy.Requirements.Add(new CourseInstructorRequirement()));
+builder.Services.AddSingleton<IAuthorizationHandler, CourseInstructorHandler>();
 // ======================================
 // RATE LIMITING
 // ======================================
@@ -409,7 +415,15 @@ policy.WithOrigins(allowedOrigins)
 });
 });
 
-
+builder.Services.AddRateLimiter(options =>
+{
+options.AddFixedWindowLimiter("AuthLimiter", opt =>
+{
+opt.PermitLimit = 5;
+opt.Window = TimeSpan.FromMinutes(1);
+opt.QueueLimit = 0;
+});
+});
 
 var app = builder.Build();
 app.UseAuthentication();
@@ -491,6 +505,15 @@ app.UseSwaggerUI(options =>
 });
 
 
+app.Use(async (context, next) =>
+{
+context.Response.Headers.Append("X-Content-Type-Options",
+"nosniff");
+context.Response.Headers.Append("X-Frame-Options", "DENY");
+context.Response.Headers.Append("Referrer-Policy", "strict-origin when-cross-origin");
+context.Response.Headers.Append("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';");
+await next();
+});
 
 // ======================================
 // ROUTES
@@ -519,7 +542,16 @@ using (var scope = app.Services.CreateScope())
         scope.ServiceProvider
         .GetRequiredService<TmsDbContext>();
 
-    context.Database.Migrate();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    using (var migrationScope = app.Services.CreateScope())
+    {
+        var migrationContext = migrationScope.ServiceProvider
+            .GetRequiredService<TmsDbContext>();
+
+        migrationContext.Database.Migrate();
+    }
+}
 
     await DataSeeder.SeedAsync(context);
 }
@@ -535,3 +567,4 @@ bool match2 = service.VerifyUserPassword("Password123!", hash2);// true
 
 
 app.Run();
+public partial class Program { }
